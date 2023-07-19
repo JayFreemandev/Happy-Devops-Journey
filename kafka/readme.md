@@ -1,55 +1,70 @@
 kafka
 
-lunch
-```
-docker-compose -f zk-single-kafka-single.yml up -d
-```
+재시도  
+Producer에서 데이터 전송이 실패하면 예외 처리 코드를 작성해야한다. 대표적인 NOT_ENOUGH_REPLICAS. 귀찮다면 retries 세팅이 있다.(재시도) retry.backoff.ms도 있는데 다음 재시도까지의 대기 시간(default 100ms)
+따라서 프로듀서는 무한히 재시도를 시도하다 타임아웃을 겪게된다. 2.1 기준 delivery.timeout.ms는 2분이다. 처음 send 전송부터 카프카가 그걸 수신하기까지 2분. 만약 레코드가 이 타임아웃안에 못받으면 전송 실패로 확인한다.
 
-running check
-```
-docker-compose -f zk-single-kafka-single.yml ps
-```
+멱등 프로듀서   
+프로듀서가 카프카에 데이터를 전송할때 네트워크 오류로 인해 중복된 메세지가 전송 될 수 있다.  
+좋은 예시) 프로듀서 데이터 전송 -> 카프카가 메세지를 로그에 커밋 -> 수신 확인 ACK 반환  
+나쁜 예시) 프로듀서 데이터 전송 -> 카프카가 메세지를 로그에 커밋 -> 수신 확인 ACK 도달 실패(네트워크 오류) !!!
+ACK를 못받은 프로듀서는 다시 메세지를 Retry 생성(재시도) -> 재생성된 메세지를 새로운걸로 인지하고 카프카가 중복된 메세지 커밋 -> ACK 반환
 
-컨테이너 접속(.sh 없이 커맨드 사용)
+멱등 프로듀서를 사용시 나쁜 예시 상황에서 중복 생성 요청을 알아차리고 두 번 커밋하지않고 ACK를 보내 수신 확인을 보낸다.
 ```
-docker exec -it kafka1 /bin/bash
-```
-
-카프카 stop or down
-```
-docker-compose -f zk-single-kafka-single.yml stop
-or
-docker-compose -f zk-single-kafka-single.yml down
+producerProps.put("enable.idempotence", true);
 ```
 
-topics
+카프카 3.0 부터는 default로 권장중이다. 2.8은 ack가 all이 아니라 1이고 위 멱등성도 false로 되어있어서 설정 필요함 3.0 버전 미만은 다음과 같이 안전한 프로듀서 설정이 필요함  
+- ENABLE_IDEMPOTENCE_CONFIG -> TRUE
+- ACKS_CONFIG -> ALL
+- RETIRES_CONFIG -> MAX_VLAUE
+
+프로듀서 메세지 압축  
+메세지 압축해서 보내면 전송 속도 향상됨(요청 크기를 최소 1/4 줄임), 메세지를 압축하는 시기는 다양하게 있는데 프로듀서 레벨에서 압축해서 보내면 브로커나 컨슈머 변경 없이 사용가능하다.
+- 프로듀서 전송 요청 사이즈 작아짐
+- 네트워크 전송 속도 향상(Latency 낮아져서)
+- 높은 처리량
+- 메세지 저장하는 디스크 효율 증가
+압축 타입은 gzip이나 여러가지가 있지나 overall을 따져봤을때 snappy와 laz4가 optimal한 속도와 압축 비율을 보여줌.
+
+브로커 / 토픽 레벨 메세지 압축
+프로듀서 말고도 브로커나 토픽 레벨에서 압축을 시도 할 수 있는데 브로커에 적용하면 모든 토픽적용이고 토픽에만 적용하면 해당 토픽만 메세지 압축 적용된다.
+브로커는 더 많은 CPU 사이클 소모해서 성능에 영향을 줄 수 있다.
 ```
-kafka-topics
+compression.type = producer
 ```
 
-############################
-#####     LOCALHOST    #####
-############################
+linger.ms와 batch size  
+기본적으로 프로듀서가 레코드를 전송할때 프로듀서와 브로커 사이 연결된 max flight connection 수만큼 병렬적으로 동작하는데 전송 도중에 더 많은 데이터가 전송되야 한다면
+카프카가 다음 전송 전에 똑똑하게 메세지 배치를 만들게 되는데 배치로 인해 처리량을 늘리면서 지연 시간을 매우 낮게 가져가게 된다. 배치 향상을 위해 두가지 세팅이 영향을 준다.
+- linger.ms : default 0, 배치 전송할때 기다리는 시간 5초로 설정하면 5초 딜레이 생기는 동안 프로듀서가 전송전에 배치에 메세지를 주워 담게된다.
+- batch.size : 설정시 linger.ms 이전에 배치가 꽉 차게 되면 배치 크기를 늘린다. deffault는 16kb고 배치 사이즈보다 큰 메세지는 그냥 바로 전송시킨다. 배치는 전송하는 파티션
+마다 하나씩 할당되기때문에 너무 크게 잡으면 메모리 낭비가 있다.
+```
+COMPRESSION_TYPE_CONFIG -> snappy
+LINGER_MS_CONFIG -> 20
+BATCH_SIZE_CONFIG, Integer.ToStringa(32*1024)
+```
+한번 전송할때 배치에 꽉 눌러담고 압축 과정까지 거치고 카프카로 전송되는 극락의 과정을 겪는다.
 
-kafka-topics.sh 
+Compression Type Snappy  
+로그나, JSON 메세지 압축할때 스내피가 괜찮다. CPU 사이클과 압축률 벨런스가 괜찮기 때문
 
-kafka-topics --bootstrap-server localhost:9092 --list 
+키가 NULL이 아닐때 프로듀서의 Default Partitioner
 
-kafka-topics --bootstrap-server localhost:9092 --topic first_topic --create
 
-kafka-topics. --bootstrap-server localhost:9092 --topic second_topic --create --partitions 3
 
-kafka-topics --bootstrap-server localhost:9092 --topic third_topic --create --partitions 3 --replication-factor 2
 
-# Create a topic (working)
-kafka-topics --bootstrap-server localhost:9092 --topic third_topic --create --partitions 3 --replication-factor 1
 
-# List topics
-kafka-topics --bootstrap-server localhost:9092 --list 
 
-# Describe a topic
-kafka-topics --bootstrap-server localhost:9092 --topic first_topic --describe
 
-# Delete a topic 
-kafka-topics --bootstrap-server localhost:9092 --topic first_topic --delete
-# (only works if delete.topic.enable=true)
+
+
+
+
+
+
+
+
+
