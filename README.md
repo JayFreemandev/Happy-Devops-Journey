@@ -1,6 +1,6 @@
 # Happy-Devops-Journey
 Devops Ecosystem 연동과 관련된 학습 Repo
- 
+ #### Docker
  #### Apache Kafka 3.0  
  **공부 내용**
  - 카프카로 데이터가 움직이는 과정
@@ -13,3 +13,7 @@ Devops Ecosystem 연동과 관련된 학습 Repo
  - 멀티 클러스터 셋업, 복제(Active-Active, Active-Passive)
  - 모니터링
  - 운영시 필요한 기술
+<hr>
+
+ #### Redis 6.x
+  **공부 내용**
