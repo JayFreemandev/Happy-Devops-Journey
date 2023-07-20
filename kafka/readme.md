@@ -53,9 +53,24 @@ Compression Type Snappy
 
 키가 NULL이 아닐때 프로듀서의 Default Partitioner
 
+컨슈머 Offset 커밋 전략  
+Auto commit Java API에서 기본 제공해준다. poll() 호출시 자동으로 커밋(성공적으로 메세지를 poll 했을때) or 컨슈머 중단시 메세지 소실됨 불만이라면 
+auto true를 비활성화하고 어디까지 처리했는지에 따라 종종 commitSync commitAync로 수동으로 맞춰야한다. 물론 offset을 외부에 저장해서 실패된 offset부터 다시 재시도하게한다.  
+- 수동 컨슈머가 있어야하고 현재 프로세스 데이터와 커밋 오프셋 정보를 DB에 따로 기록하고 ConsumerRebalanceListener 인터페이스를 따로 구현하는등 매우 까다로운 과정을 거친다.
 
+컨슈머 Offset 리셋
+기본적으로 카프카는 리텐션 7일이 주어진다, 컨슈머가 7일 멈추면 읽으려는 오프셋을 무효화시킨다. 이때 auto reset latest를 설정하면 컨슈머가 로그 끝에서 부터 읽게 설정한다
+earliest로 설정하면 로그 시작부분부터 읽기 시작하면 none으로하면 오프셋 없으면 예외처리 해버린다. 재시도를 하고싶지않거나 처리를 시작하기전 데이터 복구 로직을 더하고 싶을때 사용.
+카프카 2.0 경우 하루동안 안읽으면 손실되는데 2.0 이후부터는 7일로 늘어났다. 이 항목은 retention.minutes로 조정이 가능하고 한달로 조정하는 경우가 많다.
 
+ 
+대용량 데이터 처리  
+```
+BulkRequest bulkRequest = new BulkRequest();
+```
+카프카 컨슈머 -> 엘라스틱 서치로 바꾸면 효율성 증가(OpenSearch)
 
+z
 
 
 
