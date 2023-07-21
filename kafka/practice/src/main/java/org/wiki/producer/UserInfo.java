@@ -1,4 +1,4 @@
-package org.example;
+package org.wiki.producer;
 
 import java.util.Locale;
 import java.util.ResourceBundle;
