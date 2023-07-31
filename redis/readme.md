@@ -4,9 +4,7 @@ Redis 학습 Repo
 - Set과 유사하게 유니크한 값의 집합이고 각 값은 연관된 스코어를 가지고 정렬되어있다
 - 정렬된 상태이기때문에 빠르게 최소/최대값을 구할 수 있다.
 - 예) 순위 계산, 리더보드 구현등에 활용된다.
-
-https://github.com/JayFreemandev/Happy-Devops-Journey/assets/72185011/eef1941f-d83d-43ad-9768-5f00472c993d
-
+![image](https://github.com/JayFreemandev/Happy-Devops-Journey/assets/72185011/e674cfec-abc6-4a0b-b37e-1c2a0c274c8f)  
 RDB로 표현한다면 각 스코어가 갱신될때마다 동일한 테이블 접근해서 업데이트를 치다 경합조건(Race)에 걸릴 수 있다.
 
 **Bitmaps**
