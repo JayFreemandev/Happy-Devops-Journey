@@ -31,6 +31,6 @@ spec:
     spec:
       containers:
       - name: flask-hello
-        image: jayfreemandev/flask-hello:1.1
+        image: jayfreemandev/flask-hello:1.0
         ports:
         - containerPort: 8080
