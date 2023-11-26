@@ -20,7 +20,7 @@ flask yaml 배포
 flask폴더 이동후 kubectl apply -f flaskApp.yaml  
 minikube service flask-hello -n hello  
 
-**elk 커맨드 입력**
+**elk 커맨드 입력**  
 kubectl create namespace elk  
 3. helm repo add elastic https://helm.elastic.co  
 4. es폴더 이동후 kubectl apply -f pv.yaml -n elk  
